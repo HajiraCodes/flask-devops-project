@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: flaskapp
+      POSTGRES_USER: flaskuser
+      POSTGRES_PASSWORD: flaskpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flaskuser -d flaskapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Application Instance 1
+  app1:
+    build: .
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: 5000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATABASE_URI: postgresql+psycopg2://flaskuser:flaskpass@postgres:5432/flaskapp
+    ports:
+      - "5003:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Application Instance 2
+  app2:
+    build: .
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: 5000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATABASE_URI: postgresql+psycopg2://flaskuser:flaskpass@postgres:5432/flaskapp
+    ports:
+      - "5004:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
